@@ -41,6 +41,7 @@ class Task {
   final String userId;
   final List<String> sharedWith; // List of friend user IDs
   final List<TaskCompletion> completions; // Who completed the task
+  final DateTime? dueAt; // Optional due date/time
 
   Task({
     required this.id,
@@ -53,6 +54,7 @@ class Task {
     required this.userId,
     this.sharedWith = const [],
     this.completions = const [],
+    this.dueAt,
   });
 
   factory Task.fromFirestore(DocumentSnapshot doc) {
@@ -71,6 +73,7 @@ class Task {
       userId: data['userId']?.toString() ?? '',
       sharedWith: (data['sharedWith'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
       completions: (data['completions'] as List<dynamic>?)?.map((e) => TaskCompletion.fromMap(e as Map<String, dynamic>)).toList() ?? [],
+      dueAt: (data['dueAt'] as Timestamp?)?.toDate(),
     );
   }
 
@@ -85,6 +88,7 @@ class Task {
       'userId': userId,
       'sharedWith': sharedWith,
       'completions': completions.map((e) => e.toMap()).toList(),
+      if (dueAt != null) 'dueAt': Timestamp.fromDate(dueAt!),
     };
   }
 
@@ -99,6 +103,7 @@ class Task {
     String? userId,
     List<String>? sharedWith,
     List<TaskCompletion>? completions,
+    DateTime? dueAt,
   }) {
     return Task(
       id: id ?? this.id,
@@ -111,6 +116,7 @@ class Task {
       userId: userId ?? this.userId,
       sharedWith: sharedWith ?? this.sharedWith,
       completions: completions ?? this.completions,
+      dueAt: dueAt ?? this.dueAt,
     );
   }
 

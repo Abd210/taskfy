@@ -46,6 +46,13 @@ class TaskItem extends StatelessWidget {
     final priorityColor = _getPriorityColor(task.priority);
     final uid = FirebaseAuth.instance.currentUser?.uid;
     final mineCompleted = uid != null && task.completions.any((c) => c.userId == uid);
+  final due = task.dueAt;
+  final now = DateTime.now();
+  Duration? left = due != null ? due.difference(now) : null;
+  final bool overdue = left != null && left.isNegative;
+  final bool within1h = left != null && !left.isNegative && left.inMinutes <= 60;
+  final int daysLeft = left != null && !left.isNegative ? left.inDays : -1;
+  final bool within24hButMoreThan1h = left != null && !left.isNegative && left.inHours < 24 && left.inMinutes > 60;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -132,8 +139,11 @@ class TaskItem extends StatelessWidget {
                       
                       const SizedBox(height: 8),
                       
-                      // Priority and Time
-                      Row(
+                      // Priority, time, completions, due (wrap to avoid overflow)
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           // Priority Badge
                           Container(
@@ -156,9 +166,7 @@ class TaskItem extends StatelessWidget {
                             ),
                           ),
                           
-                          const SizedBox(width: 8),
-                          
-                          // Time
+                          // Time created
                           Text(
                             _formatTime(task.createdAt),
                             style: GoogleFonts.poppins(
@@ -169,7 +177,6 @@ class TaskItem extends StatelessWidget {
                           
                           // Completion Avatars
                           if (task.completions.isNotEmpty) ...[
-                            const SizedBox(width: 8),
                             Row(
                               children: task.completions.take(3).map((completion) {
                                 return Container(
@@ -191,7 +198,7 @@ class TaskItem extends StatelessWidget {
                             ),
                             if (task.completions.length > 3)
                               Container(
-                                margin: const EdgeInsets.only(left: 4),
+                                margin: const EdgeInsets.only(left: 2),
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: Colors.grey[300],
@@ -205,6 +212,47 @@ class TaskItem extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                          ],
+
+                          // Due info (only when not checked)
+                          if (due != null && !mineCompleted) ...[
+                            Icon(
+                              (overdue || within1h) ? Icons.warning_amber_rounded : Icons.schedule,
+                              size: 16,
+                              color: (
+                                overdue
+                                    ? Colors.red[700]
+                                    : within1h
+                                        ? Colors.red[600]
+                                        : (daysLeft >= 2)
+                                            ? Colors.green[600]
+                                            : (daysLeft == 1)
+                                                ? Colors.amber[600]
+                                                : within24hButMoreThan1h
+                                                    ? Colors.red[600]
+                                                    : Colors.grey[600]
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              _formatDueLeft(due),
+                              style: GoogleFonts.poppins(
+                                fontSize: 12,
+                                color: (
+                                  overdue
+                                      ? Colors.red[700]
+                                      : within1h
+                                          ? Colors.red[600]
+                                          : (daysLeft >= 2)
+                                              ? Colors.green[700]
+                                              : (daysLeft == 1)
+                                                  ? Colors.amber[700]
+                                                  : within24hButMoreThan1h
+                                                      ? Colors.red[700]
+                                                      : Colors.grey[700]
+                                ),
+                              ),
+                            ),
                           ],
                         ],
                       ),
@@ -241,6 +289,22 @@ class TaskItem extends StatelessWidget {
     } else {
       return 'Just now';
     }
+  }
+
+  String _formatDueLeft(DateTime due) {
+    final now = DateTime.now();
+    final diff = due.difference(now);
+    if (diff.isNegative) {
+      final ago = now.difference(due);
+      if (ago.inDays >= 1) return 'late ${ago.inDays}d';
+      if (ago.inHours >= 1) return 'late ${ago.inHours}h';
+      return 'late ${ago.inMinutes}m';
+    }
+    if (diff.inDays >= 2) return '${diff.inDays} days';
+    if (diff.inDays >= 1) return 'tmr';
+    if (diff.inHours >= 1) return '${diff.inHours}h';
+    if (diff.inMinutes > 0) return '${diff.inMinutes}m';
+    return 'now';
   }
 }
 

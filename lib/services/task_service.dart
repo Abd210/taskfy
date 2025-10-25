@@ -104,7 +104,7 @@ class TaskService {
   }
 
   // Add new task
-  Future<void> addTask(String title, {String? description, TaskPriority priority = TaskPriority.medium, List<String> sharedWith = const []}) async {
+  Future<void> addTask(String title, {String? description, TaskPriority priority = TaskPriority.medium, List<String> sharedWith = const [], DateTime? dueAt}) async {
     if (_userId.isEmpty) throw Exception('User not authenticated');
 
     final now = DateTime.now();
@@ -118,6 +118,7 @@ class TaskService {
       updatedAt: now,
       userId: _userId,
       sharedWith: sharedWith,
+      dueAt: dueAt,
     );
 
     await _firestore.collection('tasks').add(task.toFirestore());

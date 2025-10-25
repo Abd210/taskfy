@@ -29,6 +29,7 @@ class _TaskDetailsModalState extends State<TaskDetailsModal> {
   List<Friend> _friends = [];
   bool _showAllTasks = true;
   final FriendService _friendService = FriendService();
+  DateTime? _dueAt;
 
   @override
   void initState() {
@@ -37,6 +38,7 @@ class _TaskDetailsModalState extends State<TaskDetailsModal> {
     _descriptionController = TextEditingController(text: widget.task.description ?? '');
     _selectedPriority = widget.task.priority;
     _selectedFriends = List.from(widget.task.sharedWith);
+  _dueAt = widget.task.dueAt;
     
     _titleController.addListener(_checkForChanges);
     _descriptionController.addListener(_checkForChanges);
@@ -56,7 +58,8 @@ class _TaskDetailsModalState extends State<TaskDetailsModal> {
     final hasChanges = _titleController.text.trim() != widget.task.title ||
         _descriptionController.text.trim() != (widget.task.description ?? '') ||
         _selectedPriority != widget.task.priority ||
-        !_listEquals(_selectedFriends, widget.task.sharedWith);
+    !_listEquals(_selectedFriends, widget.task.sharedWith) ||
+    _dueAt != widget.task.dueAt;
     
     if (hasChanges != _hasChanges) {
       setState(() => _hasChanges = hasChanges);
@@ -109,6 +112,42 @@ class _TaskDetailsModalState extends State<TaskDetailsModal> {
     _checkForChanges();
   }
 
+  Future<void> _pickDueDateTime() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _dueAt ?? now,
+      firstDate: now.subtract(const Duration(days: 0)),
+      lastDate: DateTime(now.year + 5),
+    );
+    if (date == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_dueAt ?? now.add(const Duration(hours: 1))),
+    );
+    setState(() {
+      if (time == null) {
+        _dueAt = DateTime(date.year, date.month, date.day);
+      } else {
+        _dueAt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      }
+    });
+    _checkForChanges();
+  }
+
+  String _formatDue(DateTime due) {
+    final now = DateTime.now();
+    final dif = due.difference(now);
+    if (dif.inDays >= 1) {
+      return 'Due in ${dif.inDays}d';
+    } else if (dif.inHours >= 1) {
+      return 'Due in ${dif.inHours}h';
+    } else if (dif.inMinutes > 0) {
+      return 'Due in ${dif.inMinutes}m';
+    }
+    return 'Due now';
+  }
+
   void _saveChanges() {
     if (_titleController.text.trim().isEmpty) return;
     
@@ -120,6 +159,7 @@ class _TaskDetailsModalState extends State<TaskDetailsModal> {
       priority: _selectedPriority,
       sharedWith: _selectedFriends,
       updatedAt: DateTime.now(),
+      dueAt: _dueAt,
     );
     
     widget.onUpdate(updatedTask);
@@ -275,6 +315,40 @@ class _TaskDetailsModalState extends State<TaskDetailsModal> {
                   ),
                   
                   const SizedBox(height: 20),
+
+                  // Due date/time
+                  Text(
+                    'Due date (optional)',
+                    style: GoogleFonts.poppins(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.grey[700],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _pickDueDateTime,
+                        icon: const Icon(Icons.event),
+                        label: Text(
+                          _dueAt == null ? 'Add due' : _formatDue(_dueAt!),
+                          style: GoogleFonts.poppins(),
+                        ),
+                      ),
+                      if (_dueAt != null) ...[
+                        const SizedBox(width: 8),
+                        IconButton(
+                          onPressed: () {
+                            setState(() => _dueAt = null);
+                            _checkForChanges();
+                          },
+                          icon: const Icon(Icons.close),
+                          tooltip: 'Clear due',
+                        ),
+                      ],
+                    ],
+                  ),
                   
                   // Description Field
                   Text(
