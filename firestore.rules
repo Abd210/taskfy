@@ -1,8 +1,25 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow authenticated users to read and write all documents
+    // Allow all authenticated users to read and write all documents
     match /{document=**} {
+      allow read, write, create, delete: if request.auth != null;
+    }
+    
+    // Explicit rules for each collection
+    match /tasks/{taskId} {
+      allow read, write, create, delete: if request.auth != null;
+    }
+    
+    match /friends/{friendId} {
+      allow read, write, create, delete: if request.auth != null;
+    }
+    
+    match /userSettings/{userId} {
+      allow read, write, create, delete: if request.auth != null;
+    }
+    
+    match /users/{userId} {
       allow read, write, create, delete: if request.auth != null;
     }
   }
