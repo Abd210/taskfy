@@ -2,143 +2,158 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:async';
 import '../models/friend_model.dart';
+import 'user_service.dart';
 
 class FriendService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   
   // Stream controllers to avoid multiple listeners
-  StreamController<List<Friend>>? _friendsController;
-  StreamController<List<Friend>>? _requestsController;
-  StreamController<UserSettings>? _settingsController;
+  // Legacy controllers removed in favor of direct Firestore streams
 
   String get _userId => _auth.currentUser?.uid ?? '';
 
-  void dispose() {
-    _friendsController?.close();
-    _requestsController?.close();
-    _settingsController?.close();
-  }
+  void dispose() {}
 
   // Get all friends
   Stream<List<Friend>> getFriends() {
     if (_userId.isEmpty) return Stream.value([]);
-    
-    _friendsController?.close();
-    _friendsController = StreamController<List<Friend>>.broadcast();
-    
-    _firestore
+    return _firestore
         .collection('friends')
         .where('userId', isEqualTo: _userId)
+        .where('isAccepted', isEqualTo: true)
         .snapshots()
-        .listen(
-      (snapshot) {
-        final friends = snapshot.docs
-            .map((doc) => Friend.fromFirestore(doc))
-            .where((friend) => friend.isAccepted)
-            .toList();
-        _friendsController?.add(friends);
-      },
-      onError: (error) {
-        print('Error loading friends: $error');
-        _friendsController?.add([]);
-      },
-    );
-    
-    return _friendsController!.stream;
+        .map((snapshot) => snapshot.docs.map(Friend.fromFirestore).toList());
   }
 
   // Get pending friend requests
   Stream<List<Friend>> getPendingRequests() {
     if (_userId.isEmpty) return Stream.value([]);
-    
-    _requestsController?.close();
-    _requestsController = StreamController<List<Friend>>.broadcast();
-    
-    // Simplified query - get all friends where current user is the friendId and not accepted
-    _firestore
+    return _firestore
         .collection('friends')
         .where('friendId', isEqualTo: _userId)
+        .where('isAccepted', isEqualTo: false)
         .snapshots()
-        .listen(
-      (snapshot) {
-        final requests = snapshot.docs
-            .map((doc) => Friend.fromFirestore(doc))
-            .where((friend) => !friend.isAccepted)
-            .toList();
-        _requestsController?.add(requests);
-      },
-      onError: (error) {
-        print('Error loading requests: $error');
-        _requestsController?.add([]);
-      },
-    );
-    
-    return _requestsController!.stream;
+        .map((snapshot) => snapshot.docs.map(Friend.fromFirestore).toList());
   }
 
   // Send friend request
   Future<void> sendFriendRequest(String friendEmail) async {
     if (_userId.isEmpty) throw Exception('User not authenticated');
-    
-    final friendUsername = friendEmail.split('@').first;
-    final friendId = 'temp_${friendEmail.hashCode}';
-    
-    // Create friend request directly without checking (for demo purposes)
+
+    final normalizedEmail = friendEmail.trim().toLowerCase();
+
+    // Resolve friend user by email from users collection
+    final userService = UserService();
+    final me = await userService.getCurrentUserProfile();
+    if (me == null) {
+      // Try to ensure my profile exists (first-time login)
+      await userService.ensureCurrentUserProfile();
+    }
+
+    final target = await userService.getUserByEmail(normalizedEmail);
+    if (target == null) {
+      throw Exception('User with this email was not found');
+    }
+
+    final friendId = target.uid;
+    if (friendId == _userId) {
+      throw Exception('You cannot send a friend request to yourself');
+    }
+
+    // Prevent duplicate requests (either direction)
+    final existingA = await _firestore
+        .collection('friends')
+        .where('userId', isEqualTo: _userId)
+        .where('friendId', isEqualTo: friendId)
+        .limit(1)
+        .get();
+
+    final existingB = await _firestore
+        .collection('friends')
+        .where('userId', isEqualTo: friendId)
+        .where('friendId', isEqualTo: _userId)
+        .limit(1)
+        .get();
+
+    if (existingA.docs.isNotEmpty || existingB.docs.isNotEmpty) {
+      throw Exception('You already have a pending or existing friendship');
+    }
+
+    final requesterEmail = (me?.email ?? _auth.currentUser?.email ?? '').toLowerCase();
+    final requesterUsername = requesterEmail.split('@').first;
+
+    // Create friend request document (requester -> receiver)
     await _firestore.collection('friends').add({
-      'userId': _userId,
-      'friendId': friendId,
-      'friendEmail': friendEmail,
-      'friendUsername': friendUsername,
+      'userId': _userId, // requester
+      'friendId': friendId, // receiver
       'isAccepted': false,
       'createdAt': Timestamp.fromDate(DateTime.now()),
+      // denormalized for UI
+      'friendEmail': target.email,
+      'friendUsername': target.username,
+      'requesterEmail': requesterEmail,
+      'requesterUsername': requesterUsername,
     });
   }
 
   // Accept friend request
-  Future<void> acceptFriendRequest(String friendId) async {
+  Future<void> acceptFriendRequest(String requesterId) async {
     if (_userId.isEmpty) throw Exception('User not authenticated');
-    
-    // Find the friend request
+
+    // Find the friend request (requester -> me)
     final friendQuery = await _firestore
         .collection('friends')
         .where('friendId', isEqualTo: _userId)
-        .where('userId', isEqualTo: friendId)
+        .where('userId', isEqualTo: requesterId)
         .limit(1)
         .get();
-    
+
     if (friendQuery.docs.isEmpty) {
       throw Exception('Friend request not found');
     }
-    
+
     final friendDoc = friendQuery.docs.first;
     final friendData = friendDoc.data();
-    
+
     // Update the friend request to accepted
     await friendDoc.reference.update({'isAccepted': true});
-    
-    // Create reverse friendship
+
+    // Create reverse friendship (me -> requester)
+    // Need both users' display info
+    final userService = UserService();
+    final me = await userService.getCurrentUserProfile() ??
+        await userService.ensureCurrentUserProfile();
+    final requester = await userService.getUserById(requesterId);
+
+    final myViewFriendEmail = requester?.email ?? friendData['requesterEmail'] ?? '';
+    final myViewFriendUsername = requester?.username ?? friendData['requesterUsername'] ?? '';
+
     await _firestore.collection('friends').add({
       'userId': _userId,
-      'friendId': friendId,
-      'friendEmail': friendData['friendEmail'],
-      'friendUsername': friendData['friendUsername'],
+      'friendId': requesterId,
       'isAccepted': true,
       'createdAt': Timestamp.fromDate(DateTime.now()),
+      // denormalized friend (the person I see as friend)
+      'friendEmail': myViewFriendEmail,
+      'friendUsername': myViewFriendUsername,
+      // denormalize me as requester for symmetry (not strictly needed here)
+      'requesterEmail': me?.email ?? (_auth.currentUser?.email ?? ''),
+      'requesterUsername': (me?.username ?? (_auth.currentUser?.email ?? '')).split('@').first,
     });
   }
 
   // Reject friend request
-  Future<void> rejectFriendRequest(String friendId) async {
+  Future<void> rejectFriendRequest(String requesterId) async {
     if (_userId.isEmpty) throw Exception('User not authenticated');
-    
+
     final friendQuery = await _firestore
         .collection('friends')
         .where('friendId', isEqualTo: _userId)
-        .where('userId', isEqualTo: friendId)
+        .where('userId', isEqualTo: requesterId)
         .limit(1)
         .get();
-    
+
     if (friendQuery.docs.isNotEmpty) {
       await friendQuery.docs.first.reference.delete();
     }
@@ -172,29 +187,20 @@ class FriendService {
 
   // Get user settings
   Stream<UserSettings> getUserSettings() {
-    if (_userId.isEmpty) return Stream.value(UserSettings(userId: '', showAllTasks: true, updatedAt: DateTime.now()));
-    
-    _settingsController?.close();
-    _settingsController = StreamController<UserSettings>.broadcast();
-    
-    _firestore
+    if (_userId.isEmpty) {
+      return Stream.value(UserSettings(userId: '', showAllTasks: true, updatedAt: DateTime.now()));
+    }
+    return _firestore
         .collection('userSettings')
         .doc(_userId)
         .snapshots()
-        .listen(
-      (doc) {
-        if (doc.exists && doc.data() != null) {
-          _settingsController?.add(UserSettings.fromFirestore(doc));
-        } else {
-          _settingsController?.add(UserSettings(userId: _userId, showAllTasks: true, updatedAt: DateTime.now()));
-        }
-      },
-      onError: (error) {
-        _settingsController?.add(UserSettings(userId: _userId, showAllTasks: true, updatedAt: DateTime.now()));
-      },
-    );
-    
-    return _settingsController!.stream;
+        .map((doc) {
+      if (doc.exists && doc.data() != null) {
+        return UserSettings.fromFirestore(doc);
+      } else {
+        return UserSettings(userId: _userId, showAllTasks: true, updatedAt: DateTime.now());
+      }
+    });
   }
 
   // Update user settings

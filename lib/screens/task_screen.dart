@@ -9,6 +9,9 @@ import '../widgets/task_input.dart';
 import '../widgets/task_details_modal.dart';
 import 'friends_screen.dart';
 import 'settings_screen.dart';
+import '../services/user_service.dart';
+import '../models/user_model.dart';
+import 'admin_screen.dart';
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
@@ -21,11 +24,21 @@ class _TaskScreenState extends State<TaskScreen> {
   final TaskService _taskService = TaskService();
   final AuthService _authService = AuthService();
   final ScrollController _scrollController = ScrollController();
+  final UserService _userService = UserService();
+  int _tapCount = 0;
+  DateTime? _lastTap;
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Ensure user profile exists even if the session was persisted
+    Future.microtask(() => _userService.ensureCurrentUserProfile());
   }
 
   void _showTaskDetails(Task task) {
@@ -59,33 +72,44 @@ class _TaskScreenState extends State<TaskScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final username = user?.email?.split('@').first ?? 'User';
+  final user = FirebaseAuth.instance.currentUser;
+  final fallbackUsername = user?.email?.split('@').first ?? 'User';
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-             Text(
-               'Hi $username!',
-               style: GoogleFonts.poppins(
-                 fontSize: 18,
-                 fontWeight: FontWeight.w600,
-                 color: Colors.grey[800],
+        title: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _handleSecretTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+               StreamBuilder<UserProfile?>(
+                 stream: _userService.streamCurrentUserProfile(),
+                 builder: (context, snapshot) {
+                   final name = snapshot.data?.username.trim();
+                   final display = (name != null && name.isNotEmpty) ? name : fallbackUsername;
+                   return Text(
+                     'Hi $display!',
+                     style: GoogleFonts.poppins(
+                       fontSize: 18,
+                       fontWeight: FontWeight.w600,
+                       color: Colors.grey[800],
+                     ),
+                   );
+                 },
                ),
-             ),
-            Text(
-              'Let\'s get things done',
-              style: GoogleFonts.poppins(
-                fontSize: 14,
-                color: Colors.grey[600],
+              Text(
+                'Let\'s get things done',
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
           PopupMenuButton<String>(
@@ -264,6 +288,59 @@ class _TaskScreenState extends State<TaskScreen> {
         ],
       ),
     );
+  }
+
+  void _handleSecretTap() async {
+    final now = DateTime.now();
+    if (_lastTap == null || now.difference(_lastTap!) > const Duration(seconds: 1)) {
+      _tapCount = 0;
+    }
+    _lastTap = now;
+    _tapCount++;
+    if (_tapCount >= 3) {
+      _tapCount = 0;
+      final ok = await _promptAdminPassword();
+      if (!mounted) return;
+      if (ok) {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const AdminScreen()),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Wrong password')),
+        );
+      }
+    }
+  }
+
+  Future<bool> _promptAdminPassword() async {
+    final controller = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Enter password'),
+          content: TextField(
+            controller: controller,
+            obscureText: true,
+            decoration: const InputDecoration(hintText: 'Password'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(ctx).pop(controller.text.trim() == 'layladube');
+              },
+              child: const Text('Enter'),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
   }
 }
 

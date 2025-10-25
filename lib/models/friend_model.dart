@@ -6,6 +6,8 @@ class Friend {
   final String friendId;
   final String friendEmail;
   final String friendUsername;
+  final String requesterEmail;
+  final String requesterUsername;
   final bool isAccepted;
   final DateTime createdAt;
 
@@ -15,6 +17,8 @@ class Friend {
     required this.friendId,
     required this.friendEmail,
     required this.friendUsername,
+    required this.requesterEmail,
+    required this.requesterUsername,
     required this.isAccepted,
     required this.createdAt,
   });
@@ -27,6 +31,8 @@ class Friend {
       friendId: data['friendId']?.toString() ?? '',
       friendEmail: data['friendEmail']?.toString() ?? '',
       friendUsername: data['friendUsername']?.toString() ?? '',
+      requesterEmail: data['requesterEmail']?.toString() ?? '',
+      requesterUsername: data['requesterUsername']?.toString() ?? '',
       isAccepted: data['isAccepted'] == true,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
@@ -38,6 +44,8 @@ class Friend {
       'friendId': friendId,
       'friendEmail': friendEmail,
       'friendUsername': friendUsername,
+      'requesterEmail': requesterEmail,
+      'requesterUsername': requesterUsername,
       'isAccepted': isAccepted,
       'createdAt': Timestamp.fromDate(createdAt),
     };

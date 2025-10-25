@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/task_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class TaskItem extends StatelessWidget {
   final Task task;
@@ -43,6 +44,8 @@ class TaskItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final priorityColor = _getPriorityColor(task.priority);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final mineCompleted = uid != null && task.completions.any((c) => c.userId == uid);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -50,8 +53,8 @@ class TaskItem extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: task.isCompleted ? Colors.grey[300]! : priorityColor.withOpacity(0.3),
-          width: task.isCompleted ? 1 : 2,
+          color: mineCompleted ? Colors.grey[300]! : priorityColor.withOpacity(0.3),
+          width: mineCompleted ? 1 : 2,
         ),
         boxShadow: [
           BoxShadow(
@@ -72,19 +75,19 @@ class TaskItem extends StatelessWidget {
               children: [
                 // Checkbox
                 GestureDetector(
-                  onTap: () => onToggle(!task.isCompleted),
+                  onTap: () => onToggle(!mineCompleted),
                   child: Container(
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: task.isCompleted ? priorityColor : Colors.grey[400]!,
+                        color: mineCompleted ? priorityColor : Colors.grey[400]!,
                         width: 2,
                       ),
-                      color: task.isCompleted ? priorityColor : Colors.transparent,
+                      color: mineCompleted ? priorityColor : Colors.transparent,
                     ),
-                    child: task.isCompleted
+                    child: mineCompleted
                         ? const Icon(
                             Icons.check,
                             color: Colors.white,
@@ -107,8 +110,8 @@ class TaskItem extends StatelessWidget {
                         style: GoogleFonts.poppins(
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
-                          color: task.isCompleted ? Colors.grey[500] : Colors.grey[800],
-                          decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                          color: mineCompleted ? Colors.grey[500] : Colors.grey[800],
+                          decoration: mineCompleted ? TextDecoration.lineThrough : null,
                         ),
                       ),
                       
@@ -119,8 +122,8 @@ class TaskItem extends StatelessWidget {
                           task.description!,
                           style: GoogleFonts.poppins(
                             fontSize: 14,
-                            color: task.isCompleted ? Colors.grey[400] : Colors.grey[600],
-                            decoration: task.isCompleted ? TextDecoration.lineThrough : null,
+                            color: mineCompleted ? Colors.grey[400] : Colors.grey[600],
+                            decoration: mineCompleted ? TextDecoration.lineThrough : null,
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,

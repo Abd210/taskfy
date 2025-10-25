@@ -32,12 +32,13 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
     if (_emailController.text.trim().isEmpty) return;
 
     try {
-      await _friendService.sendFriendRequest(_emailController.text.trim());
+      final email = _emailController.text.trim();
+      await _friendService.sendFriendRequest(email);
       _emailController.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Friend request sent to ${_emailController.text.trim()}'),
+            content: Text('Friend request sent to $email'),
             backgroundColor: Colors.green[600],
           ),
         );
@@ -369,7 +370,11 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
                         CircleAvatar(
                           backgroundColor: Colors.blue[400],
                           child: Text(
-                            request.friendUsername.substring(0, 1).toUpperCase(),
+                            (request.requesterUsername.isNotEmpty
+                                    ? request.requesterUsername
+                                    : request.userId)
+                                .substring(0, 1)
+                                .toUpperCase(),
                             style: GoogleFonts.poppins(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
@@ -382,7 +387,9 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                request.friendUsername,
+                                request.requesterUsername.isNotEmpty
+                                    ? request.requesterUsername
+                                    : request.userId,
                                 style: GoogleFonts.poppins(
                                   fontSize: 16,
                                   fontWeight: FontWeight.w500,
@@ -390,7 +397,9 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
                                 ),
                               ),
                               Text(
-                                request.friendEmail,
+                                request.requesterEmail.isNotEmpty
+                                    ? request.requesterEmail
+                                    : 'requester: ${request.userId}',
                                 style: GoogleFonts.poppins(
                                   fontSize: 14,
                                   color: Colors.grey[600],
@@ -402,14 +411,14 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
                         Row(
                           children: [
                             IconButton(
-                              onPressed: () => _acceptRequest(request.friendId),
+                              onPressed: () => _acceptRequest(request.userId),
                               icon: Icon(
                                 Icons.check,
                                 color: Colors.green[400],
                               ),
                             ),
                             IconButton(
-                              onPressed: () => _rejectRequest(request.friendId),
+                              onPressed: () => _rejectRequest(request.userId),
                               icon: Icon(
                                 Icons.close,
                                 color: Colors.red[400],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../services/user_service.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -65,6 +66,8 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
             _passwordController.text,
           );
         }
+        // Ensure profile exists after login
+        await UserService().ensureCurrentUserProfile();
       } else {
         // For registration, use username as email for simplicity
         String username = _usernameController.text.trim();
@@ -76,6 +79,12 @@ class _AuthScreenState extends State<AuthScreen> with TickerProviderStateMixin {
         await _authService.registerWithEmailAndPassword(
           finalEmail,
           _passwordController.text,
+        );
+
+        // Create user profile document
+        await UserService().ensureCurrentUserProfile(
+          username: username,
+          email: finalEmail,
         );
       }
     } catch (e) {

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/task_model.dart';
 
@@ -14,36 +15,91 @@ class TaskService {
       return Stream.value([]);
     }
     
-    return _firestore
+    // Combine: my own tasks OR tasks shared with me
+    final controller = StreamController<List<Task>>.broadcast();
+    List<Task> ownTasks = [];
+    List<Task> sharedTasks = [];
+
+    void emitMerged() {
+      try {
+        final map = <String, Task>{};
+        for (final t in ownTasks) {
+          map[t.id] = t;
+        }
+        for (final t in sharedTasks) {
+          map[t.id] = t;
+        }
+        final tasks = map.values.toList();
+        tasks.sort((a, b) {
+          final p = b.priorityValue.compareTo(a.priorityValue);
+          if (p != 0) return p;
+          return b.createdAt.compareTo(a.createdAt);
+        });
+        controller.add(tasks);
+      } catch (_) {
+        controller.add(<Task>[]);
+      }
+    }
+
+    final subA = _firestore
         .collection('tasks')
         .where('userId', isEqualTo: _userId)
         .snapshots()
-        .map((snapshot) {
-      try {
-        final tasks = snapshot.docs.map((doc) {
-          try {
-            return Task.fromFirestore(doc);
-          } catch (e) {
-            // Error parsing task, skip it
-            return null;
-          }
-        }).where((task) => task != null).cast<Task>().toList();
-        
-        // Sort tasks by priority (urgent first) and then by creation date
-        tasks.sort((a, b) {
-          // First sort by priority (higher priority first)
-          int priorityComparison = b.priorityValue.compareTo(a.priorityValue);
-          if (priorityComparison != 0) return priorityComparison;
-          
-          // Then sort by creation date (newer first)
+        .listen((snapshot) {
+      ownTasks = snapshot.docs.map((doc) {
+        try {
+          return Task.fromFirestore(doc);
+        } catch (_) {
+          return null;
+        }
+      }).whereType<Task>().toList();
+      emitMerged();
+    }, onError: (_) {
+      ownTasks = [];
+      emitMerged();
+    });
+
+    final subB = _firestore
+        .collection('tasks')
+        .where('sharedWith', arrayContains: _userId)
+        .snapshots()
+        .listen((snapshot) {
+      sharedTasks = snapshot.docs.map((doc) {
+        try {
+          return Task.fromFirestore(doc);
+        } catch (_) {
+          return null;
+        }
+      }).whereType<Task>().toList();
+      emitMerged();
+    }, onError: (_) {
+      sharedTasks = [];
+      emitMerged();
+    });
+
+    controller.onCancel = () {
+      subA.cancel();
+      subB.cancel();
+    };
+
+    return controller.stream;
+  }
+
+  // Admin: get all tasks
+  Stream<List<Task>> getAllTasks() {
+    return _firestore.collection('tasks').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        try {
+          return Task.fromFirestore(doc);
+        } catch (_) {
+          return null;
+        }
+      }).whereType<Task>().toList()
+        ..sort((a, b) {
+          final p = b.priorityValue.compareTo(a.priorityValue);
+          if (p != 0) return p;
           return b.createdAt.compareTo(a.createdAt);
         });
-        
-        return tasks;
-      } catch (e) {
-        // Error processing tasks
-        return <Task>[];
-      }
     });
   }
 
@@ -73,7 +129,7 @@ class TaskService {
   }
 
   // Toggle task completion
-  Future<void> toggleTaskCompletion(String taskId, bool isCompleted) async {
+  Future<void> toggleTaskCompletion(String taskId, bool markCompleted) async {
     if (_userId.isEmpty) throw Exception('User not authenticated');
     
     final taskDoc = await _firestore.collection('tasks').doc(taskId).get();
@@ -85,7 +141,7 @@ class TaskService {
     
     List<TaskCompletion> completions = List.from(task.completions);
     
-    if (isCompleted) {
+    if (markCompleted) {
       // Add completion if not already completed by this user
       if (!completions.any((c) => c.userId == _userId)) {
         completions.add(TaskCompletion(
@@ -100,7 +156,6 @@ class TaskService {
     }
     
     await _firestore.collection('tasks').doc(taskId).update({
-      'isCompleted': isCompleted,
       'completions': completions.map((c) => c.toMap()).toList(),
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });

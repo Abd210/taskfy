@@ -1,4 +1,29 @@
 {
-  "indexes": [],
+  "indexes": [
+    {
+      "collectionGroup": "friends",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "friendId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "friends",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "friendId", "order": "ASCENDING" },
+        { "fieldPath": "userId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "friends",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "friendId", "order": "ASCENDING" },
+        { "fieldPath": "isAccepted", "order": "ASCENDING" }
+      ]
+    }
+  ],
   "fieldOverrides": []
 }

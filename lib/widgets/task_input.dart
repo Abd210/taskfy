@@ -65,9 +65,14 @@ class _TaskInputState extends State<TaskInput> {
     setState(() => _isLoading = true);
 
     try {
+      // Determine recipients: if show all, share with all friends; else, selected only
+      final recipients = _showAllTasks
+          ? _friends.map((f) => f.friendId).toList()
+          : List<String>.from(_selectedFriends);
+
       await _taskService.addTask(
         text,
-        sharedWith: _showAllTasks ? [] : _selectedFriends,
+        sharedWith: recipients,
       );
       _controller.clear();
       _selectedFriends.clear();
