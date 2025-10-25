@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/task_model.dart';
+import '../ui/widgets/app_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class TaskItem extends StatelessWidget {
   final Task task;
   final Function(bool) onToggle;
   final VoidCallback onTap;
+  final String? themeKey;
 
   const TaskItem({
     super.key,
     required this.task,
     required this.onToggle,
     required this.onTap,
+    this.themeKey,
   });
 
   Color _getPriorityColor(TaskPriority priority) {
@@ -54,23 +57,8 @@ class TaskItem extends StatelessWidget {
   final int daysLeft = left != null && !left.isNegative ? left.inDays : -1;
   final bool within24hButMoreThan1h = left != null && !left.isNegative && left.inHours < 24 && left.inMinutes > 60;
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: mineCompleted ? Colors.grey[300]! : priorityColor.withOpacity(0.3),
-          width: mineCompleted ? 1 : 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return AppCard(
+      themeKey: themeKey,
       child: Material(
         color: Colors.transparent,
         child: InkWell(

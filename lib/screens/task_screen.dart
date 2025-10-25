@@ -7,6 +7,7 @@ import '../services/auth_service.dart';
 import '../widgets/task_item.dart';
 import '../widgets/task_input.dart';
 import '../widgets/task_details_modal.dart';
+import '../ui/theme_provider.dart';
 import 'friends_screen.dart';
 import 'settings_screen.dart';
 import '../services/user_service.dart';
@@ -45,6 +46,7 @@ class _TaskScreenState extends State<TaskScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.transparent,
       builder: (context) => TaskDetailsModal(
         task: task,
@@ -58,54 +60,67 @@ class _TaskScreenState extends State<TaskScreen> {
     );
   }
 
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-  final user = FirebaseAuth.instance.currentUser;
-  final fallbackUsername = user?.email?.split('@').first ?? 'User';
+    final user = FirebaseAuth.instance.currentUser;
+    final fallbackUsername = user?.email?.split('@').first ?? 'User';
+    final themeProvider = ThemeProvider.of(context);
+    final themeKey = themeProvider?.themeKey ?? 'white';
+    final config = themeProvider?.config;
+    
+    // Use dark text for white theme, white text for others
+    final isWhiteTheme = themeKey == 'white';
+    final textColor = isWhiteTheme ? Colors.black : Colors.white;
+    final subtextColor = isWhiteTheme ? Color(0xFF4b5563) : Colors.white.withOpacity(0.9);
 
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: GestureDetector(
+    return GradientScaffold(
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(kToolbarHeight),
+        child: Container(
+          color: config?.gradient[0] ?? Color(0xFFfafafa), // Match theme background color
+          child: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: _handleSecretTap,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-               StreamBuilder<UserProfile?>(
-                 stream: _userService.streamCurrentUserProfile(),
-                 builder: (context, snapshot) {
-                   final name = snapshot.data?.username.trim();
-                   final display = (name != null && name.isNotEmpty) ? name : fallbackUsername;
-                   return Text(
-                     'Hi $display!',
-                     style: GoogleFonts.poppins(
-                       fontSize: 18,
-                       fontWeight: FontWeight.w600,
-                       color: Colors.grey[800],
-                     ),
-                   );
-                 },
-               ),
+              StreamBuilder<UserProfile?>(
+                stream: _userService.streamCurrentUserProfile(),
+                builder: (context, snapshot) {
+                  final name = snapshot.data?.username.trim();
+                  final display = (name != null && name.isNotEmpty) ? name : fallbackUsername;
+                  return Text(
+                    'Hi $display! 👋',
+                    style: GoogleFonts.poppins(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: textColor,
+                      shadows: isWhiteTheme ? [] : [
+                        Shadow(
+                          color: Colors.black.withOpacity(0.3),
+                          offset: const Offset(0, 2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               Text(
                 'Let\'s get things done',
                 style: GoogleFonts.poppins(
                   fontSize: 14,
-                  color: Colors.grey[600],
+                  color: subtextColor,
+                  shadows: isWhiteTheme ? [] : [
+                    Shadow(
+                      color: Colors.black.withOpacity(0.2),
+                      offset: const Offset(0, 1),
+                      blurRadius: 2,
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -113,13 +128,27 @@ class _TaskScreenState extends State<TaskScreen> {
         ),
         actions: [
           PopupMenuButton<String>(
-            icon: CircleAvatar(
-              backgroundColor: Colors.deepPurple[400],
-              child: Text(
-                'U',
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+            icon: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isWhiteTheme ? Colors.white : Colors.white.withOpacity(0.9),
+                border: isWhiteTheme ? Border.all(color: Colors.black.withOpacity(0.2), width: 1.5) : null,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: CircleAvatar(
+                backgroundColor: Colors.transparent,
+                child: Text(
+                  'U',
+                  style: GoogleFonts.poppins(
+                    color: config?.primary ?? (isWhiteTheme ? Color(0xFF2563eb) : Colors.deepPurple),
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -180,6 +209,8 @@ class _TaskScreenState extends State<TaskScreen> {
           ),
         ],
       ),
+        ),
+      ),
       body: Column(
         children: [
           // Task List
@@ -188,8 +219,11 @@ class _TaskScreenState extends State<TaskScreen> {
               stream: _taskService.getTasks(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
+                  return Center(
+                    child: CircularProgressIndicator(
+                      color: isWhiteTheme ? config?.primary : Colors.white,
+                      strokeWidth: 3,
+                    ),
                   );
                 }
 
@@ -201,14 +235,15 @@ class _TaskScreenState extends State<TaskScreen> {
                         Icon(
                           Icons.error_outline,
                           size: 64,
-                          color: Colors.grey[400],
+                          color: isWhiteTheme ? Colors.grey[400] : Colors.white.withOpacity(0.7),
                         ),
                         const SizedBox(height: 16),
                         Text(
                           'Something went wrong',
                           style: GoogleFonts.poppins(
                             fontSize: 18,
-                            color: Colors.grey[600],
+                            color: isWhiteTheme ? Colors.grey[700] : Colors.white.withOpacity(0.9),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -225,22 +260,24 @@ class _TaskScreenState extends State<TaskScreen> {
                       children: [
                         Icon(
                           Icons.task_alt_outlined,
-                          size: 64,
-                          color: Colors.grey[400],
+                          size: 80,
+                          color: isWhiteTheme ? Colors.grey[400] : Colors.white.withOpacity(0.7),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 24),
                         Text(
                           'No tasks yet',
                           style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            color: Colors.grey[600],
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: isWhiteTheme ? Colors.grey[800] : Colors.white,
                           ),
                         ),
+                        const SizedBox(height: 8),
                         Text(
                           'Add your first task below!',
                           style: GoogleFonts.poppins(
-                            fontSize: 14,
-                            color: Colors.grey[500],
+                            fontSize: 16,
+                            color: isWhiteTheme ? Colors.grey[600] : Colors.white.withOpacity(0.8),
                           ),
                         ),
                       ],
@@ -256,6 +293,7 @@ class _TaskScreenState extends State<TaskScreen> {
                     final task = tasks[index];
                     return TaskItem(
                       task: task,
+                      themeKey: themeKey,
                       onToggle: (isCompleted) {
                         _taskService.toggleTaskCompletion(task.id, isCompleted);
                       },
@@ -267,22 +305,12 @@ class _TaskScreenState extends State<TaskScreen> {
             ),
           ),
           
-          // Task Input
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
+          // Task Input pinned to bottom with safe area
+          SafeArea(
+            top: false,
             child: TaskInput(
-              onTaskAdded: () {
-                _scrollToBottom();
-              },
+              themeKey: themeKey,
+              onTaskAdded: () {},
             ),
           ),
         ],

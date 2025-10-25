@@ -19,10 +19,12 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="A new Flutter project.">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="taskfy">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -31,9 +33,16 @@
 
   <title>taskfy</title>
   <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ff4aa2">
   
   <!-- Google Sign-In Client ID -->
   <meta name="google-signin-client_id" content="62676164263-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.apps.googleusercontent.com">
+  
+  <style>
+    html, body { height: 100%; margin: 0; }
+    /* cover iOS safe areas when not installed */
+    body { background: #ff4aa2; }
+  </style>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

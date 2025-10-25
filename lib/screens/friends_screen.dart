@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../ui/widgets/app_card.dart';
+import '../ui/theme_provider.dart';
 import '../models/friend_model.dart';
 import '../services/friend_service.dart';
 
@@ -57,35 +59,39 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[50],
+    final themeProvider = ThemeProvider.of(context);
+    final themeKey = themeProvider?.themeKey ?? 'white';
+    final isWhiteTheme = themeKey == 'white';
+    final textColor = isWhiteTheme ? Colors.black : Colors.white;
+    final subtextColor = isWhiteTheme ? Color(0xFF4b5563) : Colors.white.withOpacity(0.6);
+
+    return GradientScaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
+        iconTheme: IconThemeData(color: textColor),
         title: Text(
           'Friends',
           style: GoogleFonts.poppins(
             fontSize: 20,
-            fontWeight: FontWeight.w600,
-            color: Colors.grey[800],
+            fontWeight: FontWeight.bold,
+            color: textColor,
           ),
         ),
         bottom: TabBar(
           controller: _tabController,
-          labelColor: Colors.deepPurple[400],
-          unselectedLabelColor: Colors.grey[600],
-          indicatorColor: Colors.deepPurple[400],
+          labelColor: textColor,
+          unselectedLabelColor: subtextColor,
+          indicatorColor: textColor,
           tabs: [
             Tab(
               child: Text(
                 'My Friends',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
             ),
             Tab(
               child: Text(
                 'Requests',
-                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -98,20 +104,9 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
           Column(
             children: [
               // Add Friend Section
-              Container(
+              AppCard(
+                themeKey: themeKey,
                 margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -228,20 +223,9 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
                       itemCount: friends.length,
                       itemBuilder: (context, index) {
                         final friend = friends[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 8),
+                        return AppCard(
+                          themeKey: themeKey,
                           padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.05),
-                                blurRadius: 10,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
                           child: Row(
                             children: [
                               CircleAvatar(
@@ -351,20 +335,9 @@ class _FriendsScreenState extends State<FriendsScreen> with TickerProviderStateM
                 itemCount: requests.length,
                 itemBuilder: (context, index) {
                   final request = requests[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
+                  return AppCard(
+                    themeKey: themeKey,
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
                     child: Row(
                       children: [
                         CircleAvatar(

@@ -56,11 +56,13 @@ class UserSettings {
   final String userId;
   final bool showAllTasks;
   final DateTime updatedAt;
+  final String theme; // 'green' | 'pink' | 'black' | 'ocean' | 'purple'
 
   UserSettings({
     required this.userId,
     required this.showAllTasks,
     required this.updatedAt,
+    required this.theme,
   });
 
   factory UserSettings.fromFirestore(DocumentSnapshot doc) {
@@ -69,6 +71,7 @@ class UserSettings {
       userId: doc.id,
       showAllTasks: data['showAllTasks'] == true,
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      theme: (data['theme']?.toString() ?? 'white'),
     );
   }
 
@@ -76,6 +79,7 @@ class UserSettings {
     return {
       'showAllTasks': showAllTasks,
       'updatedAt': Timestamp.fromDate(updatedAt),
+      'theme': theme,
     };
   }
 }

@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../ui/widgets/app_card.dart';
 import '../services/task_service.dart';
 import '../services/friend_service.dart';
 import '../models/friend_model.dart';
 
 class TaskInput extends StatefulWidget {
   final VoidCallback onTaskAdded;
+  final String? themeKey;
 
   const TaskInput({
     super.key,
     required this.onTaskAdded,
+    this.themeKey,
   });
 
   @override
@@ -24,7 +27,6 @@ class _TaskInputState extends State<TaskInput> {
   List<Friend> _friends = [];
   bool _showAllTasks = true;
   List<String> _selectedFriends = [];
-  DateTime? _dueAt;
 
   @override
   void initState() {
@@ -59,26 +61,6 @@ class _TaskInputState extends State<TaskInput> {
     });
   }
 
-  Future<void> _pickDueDateTime() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: now,
-      firstDate: now.subtract(const Duration(days: 0)),
-      lastDate: DateTime(now.year + 5),
-    );
-    if (date == null) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(now.add(const Duration(hours: 1))),
-    );
-    if (time == null) {
-      setState(() => _dueAt = DateTime(date.year, date.month, date.day));
-      return;
-    }
-    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    setState(() => _dueAt = dt);
-  }
 
   Future<void> _addTask() async {
     final text = _controller.text.trim();
@@ -95,11 +77,9 @@ class _TaskInputState extends State<TaskInput> {
       await _taskService.addTask(
         text,
         sharedWith: recipients,
-        dueAt: _dueAt,
       );
       _controller.clear();
       _selectedFriends.clear();
-      _dueAt = null;
       widget.onTaskAdded();
     } catch (e) {
       if (mounted) {
@@ -118,34 +98,12 @@ class _TaskInputState extends State<TaskInput> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AppCard(
+      themeKey: widget.themeKey,
       padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.zero,
       child: Column(
         children: [
-          // Due date/time selector
-          Row(
-            children: [
-              OutlinedButton.icon(
-                onPressed: _pickDueDateTime,
-                icon: const Icon(Icons.event),
-                label: Text(
-                  _dueAt == null
-                      ? 'Add due'
-                      : _formatDue(_dueAt!),
-                  style: GoogleFonts.poppins(),
-                ),
-              ),
-              if (_dueAt != null) ...[
-                const SizedBox(width: 8),
-                IconButton(
-                  tooltip: 'Clear due',
-                  onPressed: () => setState(() => _dueAt = null),
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
           // Friend Selection (only show if not show all tasks and has friends)
           if (!_showAllTasks && _friends.isNotEmpty) ...[
             Container(
@@ -208,105 +166,35 @@ class _TaskInputState extends State<TaskInput> {
             const SizedBox(height: 12),
           ],
           
-          // Input Row
-          Row(
-            children: [
-              // Input Field
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: TextField(
-                    controller: _controller,
-                    decoration: InputDecoration(
-                      hintText: 'Add a new task...',
-                      hintStyle: GoogleFonts.poppins(
-                        color: Colors.grey[500],
-                        fontSize: 16,
+          // Input Field with integrated send
+          TextField(
+            controller: _controller,
+            decoration: InputDecoration(
+              hintText: 'Add a new task...',
+              suffixIcon: Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        tooltip: 'Send',
+                        onPressed: _controller.text.trim().isNotEmpty ? _addTask : null,
+                        icon: const Icon(Icons.send_rounded),
+                        color: Theme.of(context).colorScheme.primary,
                       ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 16,
-                      ),
-                    ),
-                    style: GoogleFonts.poppins(
-                      fontSize: 16,
-                      color: Colors.grey[800],
-                    ),
-                    maxLines: null,
-                    textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => _addTask(),
-                    onChanged: (value) {
-                      setState(() {}); // Rebuild to update send button state
-                    },
-                  ),
-                ),
               ),
-              
-              const SizedBox(width: 12),
-              
-              // Send Button
-              GestureDetector(
-                onTap: _controller.text.trim().isNotEmpty && !_isLoading ? _addTask : null,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: _controller.text.trim().isNotEmpty && !_isLoading
-                        ? Colors.deepPurple[400]
-                        : Colors.grey[300],
-                    shape: BoxShape.circle,
-                    boxShadow: _controller.text.trim().isNotEmpty && !_isLoading
-                        ? [
-                            BoxShadow(
-                              color: Colors.deepPurple[400]!.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                        : null,
-                  ),
-                  child: _isLoading
-                      ? const Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          ),
-                        )
-                      : Icon(
-                          Icons.send_rounded,
-                          color: _controller.text.trim().isNotEmpty && !_isLoading
-                              ? Colors.white
-                              : Colors.grey[500],
-                          size: 20,
-                        ),
-                ),
-              ),
-            ],
+            ),
+            style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[800]),
+            maxLines: null,
+            textInputAction: TextInputAction.send,
+            onSubmitted: (_) => _addTask(),
+            onChanged: (_) => setState(() {}),
           ),
         ],
       ),
     );
-  }
-
-  String _formatDue(DateTime due) {
-    final now = DateTime.now();
-    final dif = due.difference(now);
-    if (dif.inDays >= 1) {
-      return 'Due in ${dif.inDays}d';
-    } else if (dif.inHours >= 1) {
-      return 'Due in ${dif.inHours}h';
-    } else if (dif.inMinutes > 0) {
-      return 'Due in ${dif.inMinutes}m';
-    }
-    return 'Due now';
   }
 }

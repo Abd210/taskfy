@@ -188,7 +188,7 @@ class FriendService {
   // Get user settings
   Stream<UserSettings> getUserSettings() {
     if (_userId.isEmpty) {
-      return Stream.value(UserSettings(userId: '', showAllTasks: true, updatedAt: DateTime.now()));
+      return Stream.value(UserSettings(userId: '', showAllTasks: true, updatedAt: DateTime.now(), theme: 'white'));
     }
     return _firestore
         .collection('userSettings')
@@ -198,7 +198,7 @@ class FriendService {
       if (doc.exists && doc.data() != null) {
         return UserSettings.fromFirestore(doc);
       } else {
-        return UserSettings(userId: _userId, showAllTasks: true, updatedAt: DateTime.now());
+        return UserSettings(userId: _userId, showAllTasks: true, updatedAt: DateTime.now(), theme: 'white');
       }
     });
   }
@@ -211,5 +211,14 @@ class FriendService {
       'showAllTasks': showAllTasks,
       'updatedAt': Timestamp.fromDate(DateTime.now()),
     });
+  }
+
+  // Update user theme only
+  Future<void> updateUserTheme(String themeKey) async {
+    if (_userId.isEmpty) throw Exception('User not authenticated');
+    await _firestore.collection('userSettings').doc(_userId).set({
+      'theme': themeKey,
+      'updatedAt': Timestamp.fromDate(DateTime.now()),
+    }, SetOptions(merge: true));
   }
 }
